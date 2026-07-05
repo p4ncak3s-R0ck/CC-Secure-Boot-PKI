@@ -1,0 +1,42 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="GNU General Public License 3.0"
+
+[[mods]]
+modId="ccsecurebootpki"
+version="${mod_version}"
+displayName="CCSecureBoot PKI"
+displayURL="https://github.com/p4ncak3s-R0ck/CC-Secure-Boot-PKI/"
+description='''
+Adds PKI (Public Key Infrastructure) management to CCSecureBoot.
+Generate your own Certificate Authority on a floppy disk, install it as the root of trust, and sign files for PXBoot verification.
+'''
+authors = "P4ncak3s_r0ck"
+
+[[dependencies.ccsecurebootpki]]
+modId="neoforge"
+mandatory=true
+versionRange="[21.1,21.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ccsecurebootpki]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.1,1.21.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ccsecurebootpki]]
+modId="computercraft"
+mandatory=true
+versionRange="[1.119.0,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ccsecurebootpki]]
+modId="ccsecureboot"
+mandatory=true
+versionRange="[1.0.2,)"
+ordering="NONE"
+side="BOTH"

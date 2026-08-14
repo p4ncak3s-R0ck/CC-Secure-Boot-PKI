@@ -12,7 +12,7 @@ if ok and existing and #existing > 0 then
 end
 
 if not fs.exists("/disk/ca.pem") then
-    printError("No CA certificate found on disk.")
+    printError("No CA certificate found on /disk/.")
     print("Run 'gen-ca' to create a Certificate Authority, then insert the disk.")
     print()
     print("Expected file: /disk/ca.pem")
@@ -47,8 +47,6 @@ if result then
     print("CA installed as root of trust!")
     term.setTextColor(colors.white)
     print()
-    print("The CA key remains on the floppy disk.")
-    print("Keep the disk safe - you need it to sign files with 'pki-sign'.")
     print("Trust takes effect on next boot.")
     print()
 else

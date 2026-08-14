@@ -19,6 +19,7 @@ import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
+import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.math.BigInteger
 import java.nio.ByteBuffer
@@ -39,12 +40,16 @@ class PKIAPI(private val computer: IComputerSystem) : ILuaAPI {
     override fun getModuleName(): String = "pki"
 
     @LuaFunction
-    fun generateCA(name: String): Map<String, ByteBuffer> {
-        val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
-        val subject = X500Name("CN=$name")
-        val serial = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) }
+    fun generateCA(parameters:Map<String, String>,expiryTime:Date): Map<String, ByteBuffer> {
         val now = Date()
-        val expiry = Date(System.currentTimeMillis() + 30L * 365 * 24 * 60 * 60 * 1000)
+
+        val dname = parameters.entries.joinToString(",") { (key, value) ->
+            "$key=$value"
+        } as String
+
+        val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+        val subject = X500Name(dname)
+        val serial = ByteArray(32).also { SecureRandom.getInstanceStrong().nextBytes(it) }
 
         val builder = JcaX509v3CertificateBuilder(
             subject, BigInteger(serial), now, expiry, subject, keyPair.public
@@ -53,13 +58,13 @@ class PKIAPI(private val computer: IComputerSystem) : ILuaAPI {
         val holder = builder.build(signer)
         val cert = JcaX509CertificateConverter().getCertificate(holder)
 
-        val keyPem = ByteArrayOutputStream().use { out ->
+        val keyPem = ByteArrayOutputStream().use { out: OutputStream ->
             PemWriter(OutputStreamWriter(out)).use { pw ->
                 pw.writeObject(PemObject("PRIVATE KEY", keyPair.private.encoded))
             }
             out.toByteArray()
         }
-        val certPem = ByteArrayOutputStream().use { out ->
+        val certPem = ByteArrayOutputStream().use { out: OutputStream ->
             PemWriter(OutputStreamWriter(out)).use { pw ->
                 pw.writeObject(PemObject("CERTIFICATE", cert.encoded))
             }
@@ -248,14 +253,14 @@ class PKIAPI(private val computer: IComputerSystem) : ILuaAPI {
         val dir = getWorldFolder(server)
         val rootExists = dir.let { Files.exists(it.resolve("certs/root.pem")) } ?: false
         val enrolledDir = dir.resolve("certs/enrolled")
-        val enrolled = enrolledDir?.let { if (Files.exists(it)) it.toFile().list()?.size ?: 0 else 0 } ?: 0
-        val thisEnrolled = enrolledDir?.let { Files.exists(it.resolve(computer.id.toString())) } ?: false
+        val enrolled = enrolledDir.let { if (Files.exists(it)) it.toFile().list()?.size ?: 0 else 0 } ?: 0
+        val thisEnrolled = enrolledDir.let { Files.exists(it.resolve(computer.id.toString())) } ?: false
 
         return mapOf(
             "rootInstalled" to rootExists,
             "enrolledComputers" to enrolled,
             "thisComputerEnrolled" to thisEnrolled,
-            "worldPath" to (dir?.toString() ?: "unknown")
+            "worldPath" to (dir.toString() ?: "unknown")
         )
     }
 

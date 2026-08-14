@@ -7,16 +7,41 @@ end
 
 print("=== Generate Certificate Authority ===")
 print("This will create a new Ed25519 CA key pair and self-signed certificate.")
-write("Enter a name for your Certificate Authority: ")
-local name = read()
-while name == "" do
+write("Enter a COMMON NAME for your Certificate Authority: ")
+local commonName = read()
+while commonName == "" do
     write("Name must not be empty.\nEnter a name: ")
-    name = read()
+    commonName = read()
 end
 
 print()
+write("Enter a ORGANIZATION NAME for your Certificate Authority: ")
+local organizationName = read()
+while organizationName == "" do
+    write("Name must not be empty.\nEnter a name: ")
+    organizationName = read()
+end
+
+print()
+write("Enter a ORGANIZATIONAL UNIT for your Certificate Authority: (Optional)")
+local organizationUnit = read()
+
+print()
+write("Enter a STATE for your Certificate Authority: (Optional)")
+local state = read()
+
+print()
+write("Enter a COUNTRY for your Certificate Authority: (Optional)")
+local country = read()
+
+print()
 print("Generating CA key pair and certificate...")
-local ok, result = pcall(pki.generateCA, name)
+local ok, result = pcall({
+    CN=commonName,
+    O=organizationName,
+    OU=organizationUnit,
+    S=
+    })
 if not ok then
     printError("Failed to generate CA: " .. result)
     return

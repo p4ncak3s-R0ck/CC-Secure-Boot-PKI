@@ -4,7 +4,7 @@ plugins {
     id("net.neoforged.moddev") version "2.0.42-beta"
 }
 
-version = property("mod_version") as String
+version = project.property("mod_version").toString()
 group = "cc.p4ncak3s_r0ck.ccsecurebootpki"
 
 base {
@@ -25,6 +25,18 @@ neoForge {
         register("ccsecurebootpki") {
             sourceSet(sourceSets.main.get())
         }
+    }
+}
+
+tasks.processResources {
+    val replaceProperties = mapOf(
+        "mod_version" to project.property("mod_version").toString()
+    )
+
+    inputs.properties(replaceProperties)
+
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand(replaceProperties)
     }
 }
 

@@ -1,0 +1,142 @@
+name: Build and Release CCSecureBootPKI
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check mod_version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT_VERSION="$(grep -E '^mod_version=' gradle.properties | cut -d'=' -f2- | xargs)"
+
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "ERROR: mod_version was not found in gradle.properties"
+            exit 1
+          fi
+
+          BEFORE="${{ github.event.before }}"
+
+          # GitHub uses an all-zero SHA when there is no previous commit,
+          # such as the first push of a branch.
+          ZERO_SHA="0000000000000000000000000000000000000000"
+
+          if [ "$BEFORE" = "$ZERO_SHA" ]; then
+            PREVIOUS_VERSION=""
+          elif git cat-file -e "${BEFORE}:gradle.properties" 2>/dev/null; then
+            PREVIOUS_VERSION="$(
+              git show "${BEFORE}:gradle.properties" \
+                | grep -E '^mod_version=' \
+                | cut -d'=' -f2- \
+                | xargs \
+                || true
+            )"
+          else
+            PREVIOUS_VERSION=""
+          fi
+
+          echo "Previous version: ${PREVIOUS_VERSION:-<none>}"
+          echo "Current version:  $CURRENT_VERSION"
+
+          echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "mod_version changed."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "mod_version did not change."
+          fi
+
+      - name: Set up Java
+        if: steps.version.outputs.changed == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        if: steps.version.outputs.changed == 'true'
+        run: chmod +x gradlew
+
+      - name: Build JAR
+        if: steps.version.outputs.changed == 'true'
+        run: ./gradlew jar
+
+      - name: Rename JAR
+        if: steps.version.outputs.changed == 'true'
+        id: jar
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.version.outputs.version }}"
+          OUTPUT="CCSecureBootPKI-${VERSION}.jar"
+
+          mapfile -t JARS < <(
+            find build/libs \
+              -maxdepth 1 \
+              -type f \
+              -name '*.jar' \
+              ! -name '*-sources.jar' \
+              ! -name '*-javadoc.jar'
+          )
+
+          if [ "${#JARS[@]}" -eq 0 ]; then
+            echo "ERROR: No JAR found in build/libs/"
+            exit 1
+          fi
+
+          if [ "${#JARS[@]}" -gt 1 ]; then
+            echo "ERROR: Multiple candidate JARs found:"
+            printf ' - %s\n' "${JARS[@]}"
+            exit 1
+          fi
+
+          cp "${JARS[0]}" "$OUTPUT"
+
+          echo "file=$OUTPUT" >> "$GITHUB_OUTPUT"
+
+          echo "Created:"
+          ls -lh "$OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.version.outputs.version }}"
+          JAR="${{ steps.jar.outputs.file }}"
+          TAG="v${VERSION}"
+
+          # Makes rerunning a failed workflow safe.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Replacing JAR..."
+            gh release upload "$TAG" "$JAR" --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" "$JAR" \
+              --title "CCSecureBootPKI ${VERSION}" \
+              --generate-notes \
+              --target "${GITHUB_SHA}"
+          fi

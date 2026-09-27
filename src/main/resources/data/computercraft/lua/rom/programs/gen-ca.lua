@@ -36,13 +36,28 @@ local country = read()
 
 print()
 print("Generating CA key pair and certificate...")
-local ok, result = pcall({
-    CN=commonName,
-    O=organizationName,
-    OU=organizationUnit,
-    S=
-    })
-if not ok then
+
+local expiryTime = os.time({
+year = 2066,
+month = 1,
+day = 1,
+hour = 0,
+min = 0,
+sec = 0
+})
+
+local gen_ok, result = pcall(function()
+    return pki.generateCA({
+        CN=commonName,
+        O=organizationName,
+        OU=organizationUnit,
+        ST=state,
+        C = country
+    },
+            expiryTime);
+end)
+
+if not gen_ok then
     printError("Failed to generate CA: " .. result)
     return
 end

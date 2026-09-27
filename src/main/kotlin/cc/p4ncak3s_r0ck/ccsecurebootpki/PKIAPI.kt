@@ -52,46 +52,69 @@ class PKIAPI(private val computer: IComputerSystem) : ILuaAPI {
     override fun getModuleName(): String = "pki"
 
     @LuaFunction
-    fun generateCA(parameters: Map<String, String>, expiryTime: Date): Map<String, ByteBuffer> {
-        val now: Date = Date()
+    fun generateCA(
+        parameters: Map<*, *>,
+        expiryTime: Long
+    ): Map<String, ByteBuffer> {
+        val now = Date()
+        val expiryDate = Date(expiryTime)
 
-        val dname: String = parameters.entries.joinToString(",") { entry: Map.Entry<String, String> ->
+        val dname = parameters.entries.joinToString(",") { entry ->
             "${entry.key}=${entry.value}"
         }
 
-        val keyPair: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
-        val subject: X500Name = X500Name(dname)
-        val serial: ByteArray = ByteArray(32).also { bytes: ByteArray ->
+        val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+
+        val subject = X500Name(dname)
+
+        val serial = ByteArray(32).also { bytes ->
             SecureRandom.getInstanceStrong().nextBytes(bytes)
         }
 
-        val builder: JcaX509v3CertificateBuilder = JcaX509v3CertificateBuilder(
+        val builder = JcaX509v3CertificateBuilder(
             subject,
-            BigInteger(serial),
+            BigInteger(1, serial),
             now,
-            expiryTime,
+            expiryDate,
             subject,
             keyPair.public
         )
-        val signer: ContentSigner = JcaContentSignerBuilder("Ed25519").build(keyPair.private)
-        val holder: X509CertificateHolder = builder.build(signer)
-        val cert: X509Certificate = JcaX509CertificateConverter().getCertificate(holder)
 
-        val keyPem: ByteArray = ByteArrayOutputStream().use { out: ByteArrayOutputStream ->
-            PemWriter(OutputStreamWriter(out)).use { pw: PemWriter ->
-                pw.writeObject(PemObject("PRIVATE KEY", keyPair.private.encoded))
+        val signer = JcaContentSignerBuilder("Ed25519")
+            .build(keyPair.private)
+
+        val holder = builder.build(signer)
+
+        val cert = JcaX509CertificateConverter()
+            .getCertificate(holder)
+
+        val keyPem = ByteArrayOutputStream().use { out ->
+            PemWriter(OutputStreamWriter(out)).use { pw ->
+                pw.writeObject(
+                    PemObject(
+                        "PRIVATE KEY",
+                        keyPair.private.encoded
+                    )
+                )
             }
+
             out.toByteArray()
         }
 
-        val certPem: ByteArray = ByteArrayOutputStream().use { out: ByteArrayOutputStream ->
-            PemWriter(OutputStreamWriter(out)).use { pw: PemWriter ->
-                pw.writeObject(PemObject("CERTIFICATE", cert.encoded))
+        val certPem = ByteArrayOutputStream().use { out ->
+            PemWriter(OutputStreamWriter(out)).use { pw ->
+                pw.writeObject(
+                    PemObject(
+                        "CERTIFICATE",
+                        cert.encoded
+                    )
+                )
             }
+
             out.toByteArray()
         }
 
-        return mapOf<String, ByteBuffer>(
+        return mapOf(
             "key" to ByteBuffer.wrap(keyPem),
             "cert" to ByteBuffer.wrap(certPem)
         )

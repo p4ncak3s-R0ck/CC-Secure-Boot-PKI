@@ -33,8 +33,6 @@ jobs:
 
           BEFORE="${{ github.event.before }}"
 
-          # GitHub uses an all-zero SHA when there is no previous commit,
-          # such as the first push of a branch.
           ZERO_SHA="0000000000000000000000000000000000000000"
 
           if [ "$BEFORE" = "$ZERO_SHA" ]; then
@@ -129,7 +127,6 @@ jobs:
           JAR="${{ steps.jar.outputs.file }}"
           TAG="v${VERSION}"
 
-          # Makes rerunning a failed workflow safe.
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Replacing JAR..."
             gh release upload "$TAG" "$JAR" --clobber
@@ -140,3 +137,21 @@ jobs:
               --generate-notes \
               --target "${GITHUB_SHA}"
           fi
+
+      - name: Publish to Modrinth
+        if: steps.version.outputs.changed == 'true'
+        uses: cloudnode-pro/modrinth-publish@v2
+        with:
+          token: ${{ secrets.MODRINTH_TOKEN }}
+          project: ${{ secrets.MODRINTH_PROJECT_ID }}
+
+          name: CCSecureBootPKI ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          version-type: release
+
+          loaders: neoforge
+          game-versions: 1.21.1
+
+          files: ${{ steps.jar.outputs.file }}
+
+          changelog-mode: auto
